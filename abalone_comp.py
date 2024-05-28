@@ -98,11 +98,24 @@ class Net(nn.Module):
 
 class RMSLELoss(nn.Module):
     def __init__(self):
-        super().__init__()
+        super(RMSLELoss, self).__init__()
         self.mse = nn.MSELoss()
-        
+        self.epsilon = 1e-6  # Small constant to ensure numerical stability
+
     def forward(self, pred, actual):
-        return torch.sqrt(self.mse(torch.log(pred + 1), torch.log(actual + 1)))    
+        # Ensure that predictions and actual values are non-negative
+        pred = torch.clamp(pred, min=0)
+        actual = torch.clamp(actual, min=0)
+
+        # Calculate the logarithms
+        log_pred = torch.log(pred + 1 + self.epsilon)
+        log_actual = torch.log(actual + 1 + self.epsilon)
+
+        # Compute the mean squared error of the logarithms
+        mse_loss = self.mse(log_pred, log_actual)
+        
+        # Return the square root of the MSE loss
+        return torch.sqrt(mse_loss)   
 
 criterion = RMSLELoss()
 
@@ -171,14 +184,20 @@ def model_run(model, optimizer):
         epoch_loss_train = 0.0
         epoch_loss_val = 0.0
 
-        for i, data in enumerate(train_loader, 0):
+        for batch_idx, data in enumerate(train_loader, 0):
+            # data.requires_grad_() # ensure each batch of data requires gradients
             optimizer.zero_grad() # resets the gradients from the previous iteration
-            features, target = data
+            features, targets = data
+            features.requires_grad_()
+            if 0 in targets: print(targets)
             # print(features)
-            pred = torch.argmax(model(features), dim=1) # forward pass
+            # print(targets.to(int))
+            pred = model(features) # forward pass
+            targets = F.one_hot(targets.to(int)-1, num_classes=29) # subtract one to adjust one hot indices
+            # print(targets)
             # print(pred)
-            # print(target)
-            loss = criterion(pred, target) # loss computation
+            # print(targets)
+            loss = criterion(pred.double(), targets.double()) # loss computation
             loss.backward() # backward pass (calculates new gradients)
             optimizer.step() # update parameters
             train_loss += loss.item()
@@ -223,6 +242,11 @@ plt.show()
 
 ###################### EVALUATION ######################
 
+# confusion matrix
+# accuracy, F1, AUC, recall, and precision
 
 ###################### HYPERPARAMETER TUNING ######################
 
+# learning curve
+
+###################### PREDICTION ######################
