@@ -170,7 +170,7 @@ val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 ###################### TRAINING LOOP FUNCTION ######################
 
 # Accuracy metric:
-metric = torchmetrics.Accuracy(task='multiclass', num_classes=3)
+metric = torchmetrics.Accuracy(task='multiclass', num_classes=29)
 
 def model_run(model, optimizer):
     eps = np.arange(1, num_epochs+1)
@@ -193,11 +193,10 @@ def model_run(model, optimizer):
             # print(features)
             # print(targets.to(int))
             pred = model(features) # forward pass
-            targets = F.one_hot(targets.to(int)-1, num_classes=29) # subtract one to adjust one hot indices
-            # print(targets)
+            one_hot_targets = F.one_hot(targets.to(int)-1, num_classes=29) # subtract one to adjust one hot indices
             # print(pred)
             # print(targets)
-            loss = criterion(pred.double(), targets.double()) # loss computation
+            loss = criterion(pred.double(), one_hot_targets.double()) # loss computation
             loss.backward() # backward pass (calculates new gradients)
             optimizer.step() # update parameters
             train_loss += loss.item()
@@ -207,11 +206,17 @@ def model_run(model, optimizer):
         model.eval()
         with torch.no_grad():
             for i, data in enumerate(val_loader, 0):
-                features, target = data
-                pred = torch.argmax(model(features), dim=1)
-                loss = criterion(pred, target)
+                features, targets = data
+                # print(features)
+                pred = model(features) # torch.argmax(model(features), dim=1)
+                # print(pred.double())
+                one_hot_targets = F.one_hot(targets.to(int)-1, num_classes=29)
+                # print(one_hot_targets.double())
+                loss = criterion(pred.double(), one_hot_targets.double())
                 val_loss += loss.item()
-                acc = metric(pred, target.argmax(dim=-1)) 
+                print(pred.argmax(dim=-1))
+                print(targets.to(int))
+                acc = metric(pred.argmax(dim=-1), targets.to(int)) 
         epoch_loss_val = val_loss / len(val_loader)
         g_val_loss.append(epoch_loss_val)
         # print(f'Epoch loss: {epoch_loss}')
