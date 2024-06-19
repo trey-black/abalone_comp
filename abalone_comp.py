@@ -1,3 +1,6 @@
+## SAVE / LOAD THE MODEL
+## GET GPU INVOLVED
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OrdinalEncoder
@@ -13,10 +16,11 @@ from torch.utils.data import TensorDataset, DataLoader
 from torch.nn import CrossEntropyLoss
 import torch.optim as optim
 import torchmetrics
+import time as tm
 
 ###################### MODEL PARAMS ######################
 
-num_epochs = 500
+num_epochs = 20
 batch_size = 4
 
 ###################### DATA IMPORT ######################
@@ -176,9 +180,13 @@ def model_run(model, optimizer):
     eps = np.arange(1, num_epochs+1)
     g_train_loss = []
     g_val_loss = []
-    model_accuracy = []
+    model_accuracy = 0
+    best_preds = []
+    val_preds = []
+    best_ep = 0
     
     for epoch in range(num_epochs):
+        start = tm.time()
         train_loss = 0.0
         val_loss = 0.0
         epoch_loss_train = 0.0
@@ -209,23 +217,31 @@ def model_run(model, optimizer):
                 features, targets = data
                 # print(features)
                 pred = model(features) # torch.argmax(model(features), dim=1)
+                val_preds.append(pred)
                 # print(pred.double())
                 one_hot_targets = F.one_hot(targets.to(int)-1, num_classes=29)
                 # print(one_hot_targets.double())
                 loss = criterion(pred.double(), one_hot_targets.double())
                 val_loss += loss.item()
-                print(pred.argmax(dim=-1))
-                print(targets.to(int))
-                acc = metric(pred.argmax(dim=-1), targets.to(int)) 
+                # print(pred.argmax(dim=-1))
+                # print(targets.to(int))
+                acc = metric(pred.argmax(dim=-1), targets.to(int))
         epoch_loss_val = val_loss / len(val_loader)
         g_val_loss.append(epoch_loss_val)
         # print(f'Epoch loss: {epoch_loss}')
         acc = metric.compute()
-        model_accuracy.append(acc.item())
+        # model_accuracy.append(acc.item())
+
+        if acc.item() >= model_accuracy:
+            model_accuracy = acc.item()
+            best_ep = epoch+1
+            best_preds = val_preds
         # print(f'Accuracy on all data: {acc}')
         metric.reset()
         model.train()
-    return eps, g_train_loss, g_val_loss, model_accuracy
+        end = tm.time()
+        print(f"Epoch {epoch+1} completed in {end-start} seconds with an accuracy of {acc.item()}")
+    return eps, g_train_loss, g_val_loss, model_accuracy, best_ep, best_preds
 
 ###################### TRAINING ######################
 
@@ -233,25 +249,51 @@ my_nn = Net()
 
 optimizer_init = optim.Adam(my_nn.parameters())
 
-eps, g_train_loss, g_val_loss, model_accuracy = model_run(my_nn, optimizer_init)
+eps, g_train_loss, g_val_loss, model_accuracy, best_ep, best_preds = model_run(my_nn, optimizer_init)
+
+torch.save(my_nn, '/Users/treyb/Documents/Data Science/Programs/abalone_comp/basic_model.pt')
 
 fig, ax = plt.subplots()
 ax.plot(eps, g_train_loss, label='Training loss')
 ax.plot(eps, g_val_loss, label='Validation loss')
 plt.xlabel('Epochs')
-plt.suptitle(f'Model accuracy: {round(max(model_accuracy), 4)*100}%')
+plt.suptitle(f'Model accuracy: {round(model_accuracy, 4)*100}%')
 plt.legend(loc="upper right")
-plt.show()
-
-# print(max(model_accuracy))
+# plt.show()
 
 ###################### EVALUATION ######################
 
-# confusion matrix
-# accuracy, F1, AUC, recall, and precision
+targets = val_labels
+# print(targets)
+# print(best_preds)
+# print(best_ep)
+
+# CONFUSION MATRIX
+
+# ACCURACY
+# Accuracy is a metric that generally describes how the model performs across all classes. 
+# It is useful when all classes are of equal importance. 
+# It is calculated as the ratio between the number of correct predictions to the total number of predictions.
+# print(max(model_accuracy))
+
+# F1
+
+# AUC
+
+# RECALL
+# The recall is calculated as the ratio between the number of Positive samples correctly classified as Positive to the total number of Positive samples. 
+# The recall measures the model's ability to detect Positive samples. 
+# The higher the recall, the more positive samples detected.
+
+# PRECISION
+# The precision is calculated as the ratio between the number of Positive samples correctly 
+# classified to the total number of samples classified as Positive (either correctly or incorrectly). 
+# The precision measures the model's accuracy in classifying a sample as positive.
+
+# ROC
 
 ###################### HYPERPARAMETER TUNING ######################
 
 # learning curve
 
-###################### PREDICTION ######################
+###################### SUBMISSION ######################
