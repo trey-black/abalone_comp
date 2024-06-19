@@ -1,4 +1,3 @@
-## SAVE / LOAD THE MODEL
 ## GET GPU INVOLVED
 
 import pandas as pd
@@ -176,7 +175,7 @@ val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 # Accuracy metric:
 metric = torchmetrics.Accuracy(task='multiclass', num_classes=29)
 
-def model_run(model, optimizer):
+def train_model(model, optimizer, data_loader):
     eps = np.arange(1, num_epochs+1)
     g_train_loss = []
     g_val_loss = []
@@ -186,13 +185,13 @@ def model_run(model, optimizer):
     best_ep = 0
     
     for epoch in range(num_epochs):
-        start = tm.time()
+        # start = tm.time()
         train_loss = 0.0
         val_loss = 0.0
         epoch_loss_train = 0.0
         epoch_loss_val = 0.0
 
-        for batch_idx, data in enumerate(train_loader, 0):
+        for batch_idx, data in enumerate(data_loader, 0):
             # data.requires_grad_() # ensure each batch of data requires gradients
             optimizer.zero_grad() # resets the gradients from the previous iteration
             features, targets = data
@@ -208,8 +207,20 @@ def model_run(model, optimizer):
             loss.backward() # backward pass (calculates new gradients)
             optimizer.step() # update parameters
             train_loss += loss.item()
-        epoch_loss_train = train_loss / len(train_loader)
+        epoch_loss_train = train_loss / len(data_loader)
         g_train_loss.append(epoch_loss_train)
+    return
+
+def evaluate_model(model, data_loader):
+    preds = []
+    model.eval()
+    with torch.no_grad():
+        for index, data in enumerate(data_loader, 0):
+            features, targets = data
+            preds.append(model(features))            
+    return preds
+
+"""
 
         model.eval()
         with torch.no_grad():
@@ -239,9 +250,10 @@ def model_run(model, optimizer):
         # print(f'Accuracy on all data: {acc}')
         metric.reset()
         model.train()
-        end = tm.time()
+        # end = tm.time()
         print(f"Epoch {epoch+1} completed in {end-start} seconds with an accuracy of {acc.item()}")
     return eps, g_train_loss, g_val_loss, model_accuracy, best_ep, best_preds
+""" 
 
 ###################### TRAINING ######################
 
@@ -249,24 +261,23 @@ my_nn = Net()
 
 optimizer_init = optim.Adam(my_nn.parameters())
 
-eps, g_train_loss, g_val_loss, model_accuracy, best_ep, best_preds = model_run(my_nn, optimizer_init)
+# torch.save(my_nn, '/Users/treyb/Documents/Data Science/Programs/abalone_comp/basic_model.pt')
+model = torch.load('/Users/treyb/Documents/Data Science/Programs/abalone_comp/basic_model.pt')
 
-torch.save(my_nn, '/Users/treyb/Documents/Data Science/Programs/abalone_comp/basic_model.pt')
+preds = evaluate_model(model, val_loader)
+print(f'The prediction tensor: {preds[0][0]} gets converted into the final output of {torch.argmax(preds[0][0], dim=0)+1}')
 
-fig, ax = plt.subplots()
-ax.plot(eps, g_train_loss, label='Training loss')
-ax.plot(eps, g_val_loss, label='Validation loss')
-plt.xlabel('Epochs')
-plt.suptitle(f'Model accuracy: {round(model_accuracy, 4)*100}%')
-plt.legend(loc="upper right")
+# eps, g_train_loss, g_val_loss, model_accuracy, best_ep, best_preds = train_model(my_nn, optimizer_init, train_loader)
+
+# fig, ax = plt.subplots()
+# ax.plot(eps, g_train_loss, label='Training loss')
+# ax.plot(eps, g_val_loss, label='Validation loss')
+# plt.xlabel('Epochs')
+# plt.suptitle(f'Model accuracy: {round(model_accuracy, 4)*100}%')
+# plt.legend(loc="upper right")
 # plt.show()
 
 ###################### EVALUATION ######################
-
-targets = val_labels
-# print(targets)
-# print(best_preds)
-# print(best_ep)
 
 # CONFUSION MATRIX
 
